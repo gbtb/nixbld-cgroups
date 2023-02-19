@@ -29,7 +29,7 @@ rec {
           '';
           nproc = import "${nproc_}/value.nix";
           default-config = import ./config.nix { inherit nproc; };
-          #profiles = attrNames default-config.profiles;
+          profiles = attrNames default-config.profiles;
           profilesJson = pkgs.writeText "nix-daemon-cgroups-profiles" (
           let preparedProfiles = 
             mapAttrs 
@@ -64,13 +64,13 @@ show_help() {
 EOF
 }
                   availableProfiles="${builtins.toString profiles}"
-                  cat "${profilesJson}"
+                  #cat "${profilesJson}"
                   echo "Available profiles: [$availableProfiles]"
                   cpus=""
                   profile=""
                   shopt -s extglob
                   while :; do
-                      case $1 in
+                      case ''${1-default} in
                           -h|-\?|--help)
                               show_help    # Display a usage synopsis.
                               exit
@@ -96,7 +96,7 @@ EOF
                       esac
                       shift
                   done
-                echo "CPU: $cpus, Profile: $profile"/
+                echo "CPU: $cpus, Profile: ''${profile:-Not set}"
                 if [[ "$cpus" != "" ]] && [[ $profile != "" ]]; then
                   error "You can use either profile or the number of cpus as an argument";
                 fi
@@ -117,6 +117,8 @@ EOF
                     error "Profile with name $profile wasn't configured"
                     exit 1
                   fi
+
+                  echo "$profileJson"
                 fi
 
           '';
