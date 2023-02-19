@@ -2,7 +2,7 @@
 let 
   div = a: b: builtins.floor (a * 1.0 / b);
   share = a: b: builtins.floor (a * b);
-  toAllowedCpus = x: "0-${x}";
+  toAllowedCpus = x: "0-${toString x}";
 in
 {
   profiles = {

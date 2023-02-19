@@ -3,13 +3,10 @@ rec {
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    tool-config = {
-      url = "path:./config.nix";
-      flake = false;
-    };
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = inputs@{ flake-parts, tool-config, ... }:
+  outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         # To import a flake module
@@ -22,14 +19,18 @@ rec {
       perSystem = { config, self', inputs', pkgs, system, ... }:
         with builtins;
         let
+          #systemdLib = import "${inputs.nixpkgs}/nixos/lib/systemd-lib.nix" { inherit config pkgs; inherit (pkgs) lib; };
+          #profiles = systemdLib.sliceToUnit "test" {aliases = null; wantedBy = null; requiredBy = null; enable = true; overrideStrategy = "asDropin"; };
           nproc_ = pkgs.runCommandLocal "get-nproc" {} ''
             mkdir $out
-            echo $(nproc) > $out/value.nix
+            n=$(nproc)
+            #echo $((n / 2)) > $out/value.nix
+            echo $n > $out/value.nix
           '';
           nproc = import "${nproc_}/value.nix";
-          default-config = import tool-config { inherit nproc; };
-          profiles = attrNames default-config.profiles;
-          profilesJson = pkgs.writeText "nixbld-cgroups-profiles" (
+          default-config = import ./config.nix { inherit nproc; };
+          #profiles = attrNames default-config.profiles;
+          profilesJson = pkgs.writeText "nix-daemon-cgroups-profiles" (
           let preparedProfiles = 
             mapAttrs 
               (name: attrs: 
@@ -40,8 +41,8 @@ rec {
           in
           toJSON preparedProfiles
           );
-          nixbld-cgroups = pkgs.writeShellApplication { 
-            name = "nixbld-cgroups";
+          nix-daemon-cgroups = pkgs.writeShellApplication { 
+            name = "nix-daemon-cgroups";
             runtimeInputs = with pkgs; [ jq ];
             text = ''
           error() {
@@ -59,6 +60,7 @@ show_help() {
 
           -h          display this help and exit
           -f          print only path to /nix/store folder
+
 EOF
 }
                   availableProfiles="${builtins.toString profiles}"
@@ -128,8 +130,10 @@ EOF
           # Equivalent to  inputs'.nixpkgs.legacyPackages.hello;
           apps.default = {
             type = "app";
-            program = "${nixbld-cgroups}/bin/nixbld-cgroups";
+            program = "${nix-daemon-cgroups}/bin/nix-daemon-cgroups";
           };
+
+          packages.default = profilesJson;
         };
       flake = {
         # The usual flake attributes can be defined here, including system-

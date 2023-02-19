@@ -5,16 +5,17 @@
         "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1672616755,
-        "narHash": "sha256-dvwU2ORLpiP6ZMXL3CJ/qrqmtLBLF6VAc+Fois7Qfew=",
+        "lastModified": 1675933616,
+        "narHash": "sha256-/rczJkJHtx16IFxMmAWu5nNYcSXNg1YYXTHoGjLrLUA=",
         "owner": "hercules-ci",
         "repo": "flake-parts",
-        "rev": "87673d7c13a799d95ce25ff5dc7b9e15f01af2ea",
+        "rev": "47478a4a003e745402acf63be7f9a092d51b83d7",
         "type": "github"
       },
       "original": {
-        "id": "flake-parts",
-        "type": "indirect"
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -54,21 +55,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
-        "nixpkgs": "nixpkgs",
-        "tool-config": "tool-config"
-      }
-    },
-    "tool-config": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-EHyj7vHRjpaYfRF1D347h2+T3hwxo3dce4qkzK2LGfg=",
-        "path": "./config.nix",
-        "type": "path"
-      },
-      "original": {
-        "path": "./config.nix",
-        "type": "path"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
