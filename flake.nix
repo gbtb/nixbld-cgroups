@@ -35,7 +35,7 @@ rec {
             mapAttrs 
               (name: attrs: 
                 let props = mapAttrs (name: value: name + "=" + (toString value)) attrs; in
-                concatStringsSep "\n" (attrValues props)
+                concatStringsSep " " (attrValues props)
               )
             default-config.profiles;
           in
@@ -84,7 +84,7 @@ EOF
                             fi
                             ;;
                           -p|--profile)
-                            if [[ $2 == +([a-z0-9]) ]]; then
+                            if [[ $2 == +([a-zA-Z0-9]) ]]; then
                               profile=$2
                               shift 1;
                             else
@@ -112,13 +112,17 @@ EOF
                 fi
 
                 if [[ "$profile" != "" ]]; then
-                  profileJson=$(jq ."$profile" < ${profilesJson})
+                  profileJson=$(jq -r ."$profile" < ${profilesJson})
                   if [[ "$profileJson" == "null" ]]; then
                     error "Profile with name $profile wasn't configured"
                     exit 1
                   fi
 
+                  echo "${profilesJson}"
                   echo "$profileJson"
+                  #echo "$profileJson" | xargs -0 -I{} systemctl set-property nix-daemon.service {} | exit
+                  a="systemctl set-property --runtime nix-daemon.service $profileJson"
+                  $a
                 fi
 
           '';
