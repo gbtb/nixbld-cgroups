@@ -1,6 +1,6 @@
-{ moduleWithSystem }:
+{ moduleWithSystem, ... }:
 {
-  nixosModules.default = moduleWithSystem (
+  flake.nixosModules.default = moduleWithSystem (
     perSystem@{ pkgs }:
     nixos@{ ... }:
       with pkgs.lib;
