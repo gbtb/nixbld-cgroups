@@ -12,7 +12,7 @@ let
     echo $n > $out/value.nix
   '';
   nproc = import "${nproc_}/value.nix";
-  slicesNames = attrNames cfg.slices;
+  slicesNames = attrNames cfg.slices.available;
   slicesJson = pkgs.writeText "nixbld-cgroups-slices" (
     let
       preparedSlices =
@@ -21,7 +21,7 @@ let
             let props = mapAttrs (name: value: name + "=" + (toString value)) attrs; in
             concatStringsSep " " (attrValues props)
           )
-          cfg.slices;
+          cfg.slices.available;
     in
     toJSON preparedSlices
   );
@@ -53,6 +53,9 @@ let
                         echo "Available slices: [$availableSlices]"
                         cpus=""
                         slice=""
+                        stateD="''${XDG_STATE_HOME:-''$HOME/.local/state/nixbld-cgroups}"
+                        echo "$stateD"
+                        mkdir -p "$stateD"
                         shopt -s extglob
                         while :; do
                             case ''${1-default} in
@@ -68,7 +71,19 @@ let
                                       fail 'ERROR: "--cpus" requires a non-empty argument with number of cpus.';
                                   fi
                                   ;;
-                                -p|--slice)
+                                --clean-state)
+                                  daemonD="/etc/systemd/system.control/nix-daemon.service.d"
+                                  echo "Root permissions required to delete slices from $daemonD"
+                                  sudo find "$daemonD" -maxdepth 1 -type f -delete
+                                  sudo systemctl daemon-reload
+                                  rm "$stateD"/*
+                                  ;;
+                                --previous-slice)
+                                  slice=$(cat "$stateD/prev_state")
+                                  echo "Enabling previous slice: $slice"
+                                  rm "$stateD/prev_state"
+                                  ;;
+                                -s|--slice)
                                   if [[ $2 == +([a-zA-Z0-9]) ]]; then
                                     slice=$2
                                     shift 1;
@@ -105,14 +120,20 @@ let
 
                         echo "${slicesJson}"
                         echo "$sliceJson"
-                        a="systemctl set-property --runtime nix-daemon.service $sliceJson"
-                        $a
+                        cmd="systemctl set-property --runtime nix-daemon.service $sliceJson"
+                        $cmd
+                        touch "$stateD/current_state"
+                        mv "$stateD/current_state" "$stateD/prev_state"
+                        echo "$slice" > "$stateD/current_state"
                       fi
 
     '';
   };
+  onStopCmd = if cfg.slices.onScreenSaverStop == "previousSlice" then "--previous-slice" else "--slice ${cfg.slices.onScreenSaverStop}";
   systemdScript = pkgs.writeShellScript "nixbld-dbus-monitor"
-    ''dbus-monitor "type='signal',path=/org/freedesktop/ScreenSaver" | sed -u -n -e "s/   boolean true/yandex-disk start/p" -e "s/   boolean false/yandex-disk end/p"'';
+    ''dbus-monitor "type='signal',path=/org/freedesktop/ScreenSaver" \
+    | sed -u -n -e "s/   boolean true/nixbld-cgroups --slice ${cfg.slices.onScreenSaverStart}/p" \
+    -e "s/   boolean false/nixbld-cgroups ${onStopCmd}/p"'';
 in
 rec {
   lib = {
@@ -123,7 +144,7 @@ rec {
     options = {
       services.nixbld-dbus-monitor = {
         enable = mkEnableOption "dbus-monitor watching for ScreenSaver";
-        slices = mkOption {
+        slices.available = mkOption {
           description = "Definition of systemd slices, available for the nixbld-cgroups tool";
           type = types.attrsOf types.anything;
           default = {
@@ -133,11 +154,16 @@ rec {
             gaming = { AllowedCPUs = lib.toAllowedCpus (lib.share nproc 0.2); };
           };
         };
-        lockscreenProfile = mkOption {
-          type = types.enum (attrNames cfg.slices);
-          default = builtins.head (attrNames cfg.slices);
-          example = "";
-          description = "";
+        slices.onScreenSaverStart = mkOption {
+          type = types.enum slicesNames;
+          default = builtins.head slicesNames;
+          example = "allCores";
+          description = "Slice that would be set when ScreenSaver starts";
+        };
+        slices.onScreenSaverStop = mkOption {
+          type = types.enum (["previousSlice"] ++ slicesNames);
+          default = "previousSlice";
+          description = ''Slice that would be set when screen saver stops. Could be set to a name of one the slices or "previousSlice" to restore whatever slice was active before a start of the screen saver'';
         };
       };
     };
@@ -145,7 +171,6 @@ rec {
       environment.systemPackages = [ nixbld-cgroups ];
       systemd.user.services.nixbld-dbus-monitor = {
         wantedBy = [ "multi-user.target" ];
-        #environment = { DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${uid}/bus" };
         path = [ pkgs.dbus nixbld-cgroups ];
         serviceConfig.ExecStart = systemdScript;
       };
